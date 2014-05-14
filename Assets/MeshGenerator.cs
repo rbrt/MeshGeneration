@@ -12,16 +12,47 @@ public class MeshGenerator : MonoBehaviour {
 	int[] currentFaces;
 
 	int meshCount;
-
-	public void Init(Color color) {
+	
+	List<VecPair> interpolationPoints;
+	
+	Vector3 RandomVert(Vector3 vert){
+		float bound = .5f;
+		return new Vector3(vert.x + Random.Range(-bound, bound),
+		                   vert.y + Random.Range(-bound, bound),
+		                   vert.z + Random.Range(-bound, bound));
+	
+	}
+	
+	public IEnumerator Init(Color color) {
 		Random.seed = gameObject.GetInstanceID();
 		meshCount = Random.Range(20,30);
-	
+		
+		interpolationPoints = new List<VecPair>();
+		
 		baseVertices = new List<Vector3>();
 		baseVertices.Add(new Vector3(transform.position.x - 1, transform.position.y + 0, transform.position.z - 1));
+		interpolationPoints.Add (new VecPair(baseVertices[baseVertices.Count-1],
+											 RandomVert(new Vector3(transform.position.x - 1, transform.position.y + 0, transform.position.z - 1))
+											 )
+								);
+		
 		baseVertices.Add(new Vector3(transform.position.x + 1, transform.position.y + 0, transform.position.z - 1));
+		interpolationPoints.Add (new VecPair(baseVertices[baseVertices.Count-1],
+										     RandomVert(new Vector3(transform.position.x + 1, transform.position.y + 0, transform.position.z - 1))
+										     )
+								);
+		
 		baseVertices.Add(new Vector3(transform.position.x + 0, transform.position.y + 0, transform.position.z + 1));
+		interpolationPoints.Add (new VecPair(baseVertices[baseVertices.Count-1],
+											 RandomVert(new Vector3(transform.position.x + 0, transform.position.y + 0, transform.position.z + 1))
+											 )
+								);
+		
 		baseVertices.Add(new Vector3(transform.position.x + 0, transform.position.y + 2, transform.position.z + 0));
+		interpolationPoints.Add (new VecPair(baseVertices[baseVertices.Count-1],
+		                                     RandomVert(new Vector3(transform.position.x + 0, transform.position.y + 2, transform.position.z + 0))
+		                                     )
+		                         );
 		
 		triangles = new int[12];
 		
@@ -61,10 +92,22 @@ public class MeshGenerator : MonoBehaviour {
 		mesh.normals = normals.ToArray();
 		
 		meshObject.renderer.material = new Material(Shader.Find ("Particles/Alpha Blended"));
-		color.a = .15f;
+		color.a = 0f;
 		meshObject.renderer.material.SetColor("_TintColor", color);
 		
+		StartCoroutine(FadeIn(color));
 		StartCoroutine(GenerateMesh());
+		
+		yield break;
+	}
+	
+	IEnumerator FadeIn(Color color){
+		while (color.a < .15f){
+			color.a += .01f;
+			meshObject.renderer.material.SetColor("_TintColor", color);
+			yield return null;
+		}
+	
 	}
 	
 	bool CheckIfPointHitsMesh(Vector3 face){
@@ -165,24 +208,28 @@ public class MeshGenerator : MonoBehaviour {
 		mesh.triangles = triangles;
 		
 		float step = 0;
+		
 		while (step < 1){
-			step+= .05f;
+			step+= .01f;
 			var verts = mesh.vertices;
 			for (int i = 0; i < verts.Length; i++){
 				if (i == verts.Length-1){
 					verts[i] = Vector3.Lerp(temp, pointD, step);
 				}
 				else{
-					verts[i] = verts[i];
+					var sinVert = Vector3.Lerp(interpolationPoints[i].a, interpolationPoints[i].b, Mathf.Sin(interpolationPoints[i].Angle * Mathf.PI / 180));
+					verts[i] = sinVert;
 				}
 			}
 			
 			mesh.vertices = verts;
 			meshObject.GetComponent<MeshCollider>().sharedMesh = mesh;
-			
+			baseVertices = mesh.vertices.ToList();	
 			yield return null;
 		}
-		baseVertices = mesh.vertices.ToList();
+		
+		interpolationPoints.Add (new VecPair(mesh.vertices[mesh.vertices.Length-1], mesh.vertices[mesh.vertices.Length-1]));
+		
 	}
 	
 
@@ -194,9 +241,6 @@ public class MeshGenerator : MonoBehaviour {
 			
 			if (meshCount < 0){
 				break;
-			}
-			else{
-				//yield return new WaitForSeconds(.1f);
 			}
 		}
 		StartCoroutine(FadeThenDie());
@@ -213,6 +257,24 @@ public class MeshGenerator : MonoBehaviour {
 		
 		Destroy (gameObject);
 	}
+	
+}
+
+public class VecPair{
+	public Vector3 a,b;
+	
+	int angle;
+	
+	public int Angle{
+		get{ angle++; if (angle > 180){angle = 0;} return angle;}
+	}
+	
+	public VecPair(Vector3 avec, Vector3 bvec){
+		a = avec;
+		b = bvec;
+		angle = 0;
+	}
+
 }
 
 
