@@ -118,7 +118,7 @@ public class MeshGenerator : MonoBehaviour {
 		return (a + b + c) / 3;
 	}
 	
-	void GenerateNewPoint(Vector3 face){
+	IEnumerator GenerateNewPoint(Vector3 face){
 		Vector3 pointA = baseVertices[(int)face[0]],
 				pointB = baseVertices[(int)face[1]],
 				pointC = baseVertices[(int)face[2]];
@@ -130,20 +130,20 @@ public class MeshGenerator : MonoBehaviour {
 		Vector3 perp = Vector3.Cross(pointC - pointA, pointB - pointA).normalized;
 		
 		Vector3 pointD = (midpoint + perp) * Random.Range(.5f, 1.5f);
-		
-		baseVertices.Add(pointD);
+		Vector3 temp = midpoint;
+		baseVertices.Add(temp);
 		
 		List<int> newTriangles = new List<int>();
 		newTriangles.Add(baseVertices.IndexOf(pointA));
 		newTriangles.Add(baseVertices.IndexOf(pointB));
-		newTriangles.Add(baseVertices.IndexOf(pointD));
+		newTriangles.Add(baseVertices.IndexOf(temp));
 		
 		newTriangles.Add(baseVertices.IndexOf(pointA));
-		newTriangles.Add(baseVertices.IndexOf(pointD));
+		newTriangles.Add(baseVertices.IndexOf(temp));
 		newTriangles.Add(baseVertices.IndexOf(pointC));
 		
 		newTriangles.Add(baseVertices.IndexOf(pointC));
-		newTriangles.Add(baseVertices.IndexOf(pointD));
+		newTriangles.Add(baseVertices.IndexOf(temp));
 		newTriangles.Add(baseVertices.IndexOf(pointB));
 		
 		var tris = triangles.ToList();
@@ -164,22 +164,39 @@ public class MeshGenerator : MonoBehaviour {
 		mesh.vertices = baseVertices.ToArray();
 		mesh.triangles = triangles;
 		
-		meshObject.GetComponent<MeshCollider>().sharedMesh = mesh;
-		
+		float step = 0;
+		while (step < 1){
+			step+= .05f;
+			var verts = mesh.vertices;
+			for (int i = 0; i < verts.Length; i++){
+				if (i == verts.Length-1){
+					verts[i] = Vector3.Lerp(temp, pointD, step);
+				}
+				else{
+					verts[i] = verts[i];
+				}
+			}
+			
+			mesh.vertices = verts;
+			meshObject.GetComponent<MeshCollider>().sharedMesh = mesh;
+			
+			yield return null;
+		}
+		baseVertices = mesh.vertices.ToList();
 	}
 	
 
 	IEnumerator GenerateMesh(){
 		while (true){
 			var face = PickFace();
-			GenerateNewPoint(face);
+			yield return StartCoroutine(GenerateNewPoint(face));
 			meshCount--;
 			
 			if (meshCount < 0){
 				break;
 			}
 			else{
-				yield return new WaitForSeconds(.1f);
+				//yield return new WaitForSeconds(.1f);
 			}
 		}
 		StartCoroutine(FadeThenDie());
